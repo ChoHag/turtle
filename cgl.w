@@ -29,28 +29,37 @@
 @ @(cgl.h@>=
 #ifndef TRT_CGL_H
 #define TRT_CGL_H
-#include "ft/markup.h"
+#include "ft/markup.h" // lose this
 @h
 @<GL type definitions@>@;
 @<GL shared variables@>@;
 @<GL function declarations@>@;
 #endif /* |TRT_CGL_H| */
 
-@ @(cgl-opengl.h@>=
+@ Common OpenGL headers.
+
+% The thinspace directives in the include line here confuse the
+% weaver's understanding of the <...> token.
+
+@(cgl-opengl.h@>=
 #ifndef TRT_OPENGL_H
 #define TRT_OPENGL_H
-
+@#
 #include <GL/glew.h>
 #if defined(_WIN32) || defined(_WIN64)
-#  include <GL/wglew.h>
+#@,@,@,@,include <GL/wglew.h>
 #endif
-
+@#
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #endif /* |TRT_OPENGL_H| */
 
-@ @<GL type def...@>=
+@ Terminals can display from multiple fonts. For the time being
+there is one, also the special ``normal'' font. The collection of
+a particular font and its various metadata is a Face.
+
+@<GL type def...@>=
 enum {
         FACE_NORMAL,
         FACE_LENGTH
@@ -61,20 +70,29 @@ typedef struct {
         float width, height, inset;
 } cgl_face;
 
+@ OpenGL is concerned with pushing 3D co-ordinates along with other
+data associated with them to the rendering engine. The collection
+of a 3D co-ordinate and its associated metadata is known as a vertex.
+
+@<GL type def...@>=
 typedef struct {
         vec3_t pos;
         vec2_t tex;
         vec3_t col;
 } cgl_vertex;
 
-@ @<GL global...@>=
-vector_xt *Draw_Buffer, *Draw_Index;
-cgl_face Face[FACE_LENGTH];
-texture_atlas_t *Glyph_Atlas;
-GLuint Shader_Program;
-GLuint VAO;
-GLuint VBO[2];
-GLFWwindow *Win;
+@ The code running on the CPU builds collections of data which it
+sends to OpenGL for rendering on the GPU. These are handles to that
+data.
+
+@<GL global...@>=
+vector_xt *Draw_Buffer, *Draw_Index; /* Application copy of vertices to render. */
+cgl_face Face[FACE_LENGTH]; /* Font definitions. */
+texture_atlas_t *Glyph_Atlas; /* A texture of renderred glyphs. */
+GLuint Shader_Program; /* The programs running on the GPU that calculate co-ordinates and colours. */
+GLuint VAO; /* A pointer to a set of OpenGL references. */
+GLuint VBO[2]; /* Pointers to an OpenGL copy of the vertex data. */
+GLFWwindow *Win; /* The main window. */
 
 @ @<GL shared...@>=
 extern GLFWwindow *Win;
@@ -99,7 +117,9 @@ static void cgl_load_shader_program (void);
 static void cgl_report_errors (char *);
 static cgl_face cgl_load_font (char *, size_t);
 
-@ @c
+@ Many things to do here. Should probably be broken up into sections.
+
+@c
 void
 cgl_init (int w,
           int h,
@@ -107,11 +127,15 @@ cgl_init (int w,
 {
         int flags;
 
+        /* Load the font definitions and prepare an atlas of rendered glyphs. */
+
         Glyph_Atlas = texture_atlas_new(512, 512, 4);
         if (Glyph_Atlas == NULL)
                 err(1, "texture_font_get_glyph");
         glGenTextures(1, &Glyph_Atlas->id);
         Face[FACE_NORMAL] = cgl_load_font("VeraMono.ttf", font_size * 3);
+
+        /* Initialise OpenGL and report errors as they're encountered. */
 
         glfwSetErrorCallback(cgl_glerror);
         if (!glfwInit())
@@ -121,9 +145,14 @@ cgl_init (int w,
         cgl_window(w, h);
         cgl_report_errors("cgl_window");
 
+        /* The extensions must be activated after a window is opened
+                because reasons. */
+
         if (glewInit() != GLEW_OK)
                 errx(1, "glewInit"); /* {\it After\/} the window is opened. */
         inform("Using GLEW %s", glewGetString(GLEW_VERSION));
+
+        /* Activate mostly-unused debugging hooks. */
 
         glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
         if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
@@ -134,16 +163,26 @@ cgl_init (int w,
                         GL_DONT_CARE, 0, NULL, GL_TRUE);
         }
 
+        /* This is mostly of use for 3D rendering --- don't bother
+                calculating the backs of things. */
+
 #if 0 /* gl.w */
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glFrontFace(GL_CW);
 #endif
 
+        /* Probably something to do with pixel smoothing. Not
+                particularly relevant for a terminal emulator. */
+
 #if 0 /* gl.w */
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #endif
+
+        /* Again mostly useful for 3D rendering, but used here to
+                render in ``layers'' so that the glyphs can be
+                placed ``on top'' of a background layer. */
 
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);
@@ -151,31 +190,52 @@ cgl_init (int w,
         glDepthRange(0.0f, 1.0f);
         glEnable(GL_DEPTH_CLAMP);
 
+        /* Specify what blank looks like. */
+
         glClearColor(0.333, 0.499, 0.666, 1.0);
         glClearDepth(10.0f);
 
-        Draw_Buffer = vector_new(sizeof (cgl_vertex));
-        Draw_Index = vector_new(sizeof (GLushort));
-        glGenVertexArrays(1, &VAO); /* A bit pointless */
-        glGenBuffers(2, VBO);
-        glBindVertexArray(VAO); {
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBO[0]);
-                glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
-                glEnableVertexAttribArray(0);
-                glEnableVertexAttribArray(1);
-                glEnableVertexAttribArray(2);
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
-                        (void *) offsetof (cgl_vertex, pos));
-                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
-                        (void *) offsetof (cgl_vertex, tex));
-                glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
-                        (void *) offsetof (cgl_vertex, col));
-        } glBindVertexArray(0);
+        @<Prepare a Vertex Array Object (VAO)@>@;
 
         cgl_load_shader_program();
         cgl_report_errors("cgl_load_shader_program");
         inform("Compiled & linked shaders");
 }
+
+@ This is overkill for this application which only renders a single
+thing but a useful concept to be familiar with.
+
+In order to push data to OpenGL or tell it to do something with it,
+it must be informed about a number of data buffers pertaining to
+vertices, textures, programs in the rendering pipeline etc. A Vertex
+Array Object (VAO) is a set of these bindings. A single VAO is
+created here binding two buffers: One of vertices (the corners of
+each character on the screen) and one of pointers to these vertices.
+
+The texture should probably be bound here but I'm still a bit hazy
+on how VAOs and bindings work and textures are weirder still.
+
+The |glEnableVertexAttribArray| and |glVertexAttribPointer| calls
+describe the layout of the vertex data in each |cgl_vertex|.
+
+@<Prepare a Vertex Array Object (VAO)@>=
+Draw_Buffer = vector_new(sizeof (cgl_vertex));
+Draw_Index = vector_new(sizeof (GLushort));
+glGenVertexArrays(1, &VAO); /* A bit pointless */
+glGenBuffers(2, VBO);
+glBindVertexArray(VAO); {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBO[0]);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
+                (void *) offsetof (cgl_vertex, pos));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
+                (void *) offsetof (cgl_vertex, tex));
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof (cgl_vertex),
+                (void *) offsetof (cgl_vertex, col));
+} glBindVertexArray(0);
 
 @ What is this for? Does fuck all.
 
@@ -212,10 +272,7 @@ cgl_cb_debug (GLenum        source   unused,
         return;
 }
 
-@ TODO: Trigger reszie event upon creation.
-
-@.TODO@>
-@c
+@ @c
 void
 cgl_window (int w,
             int h)
@@ -262,12 +319,37 @@ cgl_cb_close (GLFWwindow *glwin)
 
 @* Drawing.
 
+A pipeline is configured. Vertices are created by the application
+and sent to OpenGL. The pipeline is constructed is misnamed ``shaders''
+which are programs that run on the GPU.
+
+Each time the screen is rendered each vertex is run through the
+{\it vertex shader\/} to calculate the final position from it's own
+3D co-ordinates to a framebuffer's 2D co-ordinates.
+
+After the vertices are processed OpenGL does its thing and calculates
+fragments. Fragments can be thought of as the individual pixels in
+the framebuffer but that's not quite right. In particular fragments
+can be smaller than pixels and the actual pixel data is calculated
+from the fragments accordingly.
+
+Each fragment is processed by a {\it fragment shader\/} which is
+primarily concerned with calculating a pixel's colour.
+
+@ This is the vertex shader. The input vertices are spread between
+three variables at hard-coded locations 0, 1 and 2.
+
+The colout and texture data from the vertex is simply assigned to
+output variables |ex_col| and |ex_tex|. These will be supplied as
+input variables to the fragment shader for this vertex. The real
+position of the vertex is returned in |gl_Position|.
+
 @(vertex.glsl@>=
 uniform mat4 projection;
 
-layout(location = 0) in vec3 vx;
-layout(location = 1) in vec2 tex;
-layout(location = 2) in vec3 col;
+layout(location = 0) in vec3 vx;@;
+layout(location = 1) in vec2 tex;@;
+layout(location = 2) in vec3 col;@;
 
 out vec4 ex_col;
 out vec2 ex_tex;
@@ -279,7 +361,16 @@ void main()
         gl_Position = projection * vec4(vx, 1.0);
 }
 
-@ @(fragment.glsl@>=
+@ The fragment shader works out what colour each pixel should be.
+Given a triangle representing half of a glyph, OpenGL has already
+worked out where within that triangle the fragment is.
+
+If the texture co-ordinates are negative then this fragment represents
+a solid colour such as the background or the cursor. Otherise it's
+a glyph and the texture co-ordinates refer to a pixel in the font
+atlas.
+
+@(fragment.glsl@>=
 uniform sampler2D atlas;
 
 in vec4 ex_col;
@@ -295,14 +386,22 @@ void main()
                 frag = ex_col;
 }
 
-@ @<GL global...@>=
+@ These routines are concerned with loading the above shader sources
+and compiling and linking to the GPU during initialisation.
+
+@<GL global...@>=
 #include "vertex.c" /* Defines |Source_vertex| \AM\ |Source_vertex_Length|. */
 #include "fragment.c" /* Defines |Source_fragment| \AM\ |Source_fragment_Length|. */
 
-@ @c
-#define SHADER_HEADER                                           \
-        "#version 330 core\n"                                   \
+@ The |GL_ARB_shading_language_include| extension included here
+with each shader allows it to be compiled from the source code in
+this \.{CWEB} document and still report the correct line numbers
+thanks to Donald Knuth's meticulous attention to detail.
+
+@d SHADER_HEADER ""@|
+        "#version 330 core\n"@|
         "#extension GL_ARB_shading_language_include : require\n"
+@c
 GLuint
 cgl_compile_shader (GLenum  type,
                     char   *source,
@@ -327,7 +426,9 @@ cgl_compile_shader (GLenum  type,
         return s;
 }
 
-@ @c
+@ There is only one shader pipeline program with the two shaders above.
+
+@c
 void
 cgl_load_shader_program (void)
 {
@@ -357,7 +458,18 @@ cgl_load_shader_program (void)
         glDeleteShader(f);
 }
 
-@ @c
+@ As an homage to simpler machines from the before times the routine
+which performs every screen draw is named ``blit''. This is the
+routine run $n$ times every second which redraws the screen contents.
+
+The process used by this application is that the frame buffer is
+cleared; if the vertex data has changed then the new texture and
+vertex buffer data is pushed to OpenGL; the pipeline is run to
+render each vertex to a collection of fragments and thence to pixels;
+the screen's active framebuffer and the framebuffer just drawn on
+to are swapped, updating the display.
+
+@c
 void
 cgl_blit (void)
 {
@@ -402,7 +514,13 @@ cgl_blit (void)
         glfwSwapBuffers(Win);
 }
 
-@ @c
+@ This routine is called when the terminal's contents have been
+changed and the vertex data representing them needs to be re-done.
+
+It includes a commented-out debugging triangle instruction in the
+first 3 indices.
+
+@c
 void
 cgl_clear_vertex_buffer (void)
 {
@@ -410,17 +528,28 @@ cgl_clear_vertex_buffer (void)
         vector_clear(Draw_Index);
 #if 0
                         GLushort i[] = { 0, 1, 2 };
-                        cgl_vertex v[] = {
-                                { { 10.0f, 10.0f, 0.0f }, { 0,0 }, { 1,1,1 } },
-                                { {100.0f, 10.0f, 0.0f }, { 0,0 }, { 1,1,1 } },
-                                { { 10.0f,100.0f, 0.0f }, { 0,0 }, { 1,1,1 } },
+                        cgl_vertex v[] = {@|
+                                { { 10.0f, 10.0f, 0.0f }, { 0,0 }, { 1,1,1 } },@|
+                                { {100.0f, 10.0f, 0.0f }, { 0,0 }, { 1,1,1 } },@|
+                                { { 10.0f,100.0f, 0.0f }, { 0,0 }, { 1,1,1 } },@/
                         };
                         vector_push_back_data(Draw_Buffer, v, sizeof (v) / sizeof (v[0]));
                         vector_push_back_data(Draw_Index, i, sizeof (i) / sizeof (i[0]));
 #endif
 }
 
-@* Fonts.
+@* Fonts. A font definition contains instructions to render the
+glyphs within that font at, usually, many font-sizes rather than
+containing a single set of instructions that are stretched as
+appropriate (it would look awful).
+
+When a font is loaded at a particular size the font is scanned to determine
+the size of each character cell on the terminal's screen.
+
+The method here is crude but effective for the time being: it scans
+each of the extended ASCII characters for its width and other
+characteristics to determine the maximum size of each cell and the
+offset of each character's glyph within it.
 
 @c
 cgl_face
@@ -478,7 +607,27 @@ cgl_load_font (char   *name,
         return newface;
 }
 
-@ @<GL global...@>=
+@ The framebuffer that OpenGL finally draws is expected to have its
+contents between -1 and 1 on the X and Y axes with the origin in
+the centre of the screen or window.
+
+This application does not render a 3D scene so the co-ordinates it
+draws into are closely related to the screen co-ordinates (there
+is some inversion). The Z co-ordinate included with each vertex
+represents a screen ``layer'' with higher values toward the viewer.
+
+The vertex shader takes these mostly-real co-ordinates and transforms
+them to fragments in OpenGL's -1 .. 1 space where the fragment
+shader can colour them in. The bits of the pipeline that you don't
+see then take these coloured in fragments and convert them to screen
+co-ordinates to paint with.
+
+That explanation needs some work. In any case the matrix in
+|Projection| is the means by which glyph vertices are transformed
+into OpenGL vertices. It's changed whenever the window is resized
+and uploaded to OpenGL during |cgl_blit|.
+
+@<GL global...@>=
 mat4_t Projection;
 
 @ @<GL shared...@>=
@@ -500,7 +649,13 @@ cgl_cb_resize (GLFWwindow *glwin,
                 h / (int) Face[FACE_NORMAL].height);
 }
 
-@ @c
+@ ``Drawing'' a glyph within a cell means pushing vertices to the
+back of |Draw_Buffer| and pointers to those vertices in |Draw_Index|.
+After all the cells of the terminal have been drawn in such a way
+the vertex data will be pushed to OpenGL which will draw it as
+described above.
+
+@c
 void
 cgl_draw_glyph (int      x,
                 int      y,
@@ -540,21 +695,21 @@ cgl_draw_glyph (int      x,
         float s1 = glyph->s1;
         float t1 = glyph->t1;
 
-        cgl_vertex v[] = {
-                { { bbl.x, bbl.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },
-                { { btr.x, bbl.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },
-                { { bbl.x, btr.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },
-                { { btr.x, btr.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },
-                { { fbl.x, fbl.y, 0 }, { s0, t1 }, { fg.x, fg.y, fg.z } },
-                { { ftr.x, fbl.y, 0 }, { s1, t1 }, { fg.x, fg.y, fg.z } },
-                { { fbl.x, ftr.y, 0 }, { s0, t0 }, { fg.x, fg.y, fg.z } },
-                { { ftr.x, ftr.y, 0 }, { s1, t0 }, { fg.x, fg.y, fg.z } },
+        cgl_vertex v[] = {@|
+                { { bbl.x, bbl.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },@|
+                { { btr.x, bbl.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },@|
+                { { bbl.x, btr.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },@|
+                { { btr.x, btr.y,-1 }, { -1, -1 }, { bg.x, bg.y, bg.z } },@|
+                { { fbl.x, fbl.y, 0 }, { s0, t1 }, { fg.x, fg.y, fg.z } },@|
+                { { ftr.x, fbl.y, 0 }, { s1, t1 }, { fg.x, fg.y, fg.z } },@|
+                { { fbl.x, ftr.y, 0 }, { s0, t0 }, { fg.x, fg.y, fg.z } },@|
+                { { ftr.x, ftr.y, 0 }, { s1, t0 }, { fg.x, fg.y, fg.z } },@/
         };
         int s = vector_size(Draw_Buffer);
         assert(s < 0xFFFF - 8);
-        GLushort i[] = {
-                s+0,s+1,s+2, s+1,s+3,s+2,
-                s+4,s+5,s+6, s+5,s+7,s+6,
+        GLushort i[] = {@|
+                s+0,s+1,s+2, s+1,s+3,s+2,@|
+                s+4,s+5,s+6, s+5,s+7,s+6,@/
         };
         vector_push_back_data(Draw_Buffer, v, sizeof (v) / sizeof (v[0]));
         vector_push_back_data(Draw_Index, i, sizeof (i) / sizeof (i[0]));

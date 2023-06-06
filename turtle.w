@@ -89,14 +89,8 @@ main (int    argc,
 
         io_init(80, 25, 12, TL_REFRESH_NSEC); /* Calls |cgl_init|. */
         term_init(80, 25);
-        //init_shaders(); /* Draw method. */
-        //init_picture(); /* Draw palette. */
-        //init_main_camera(); /* Draw where --- UI here. */
-        // needs; key,mouse,close,
-        // has: key²,mouse²,joy,close,focus,scroll
 
         clock_gettime(CLOCK_MONOTONIC, &real_clock);
-        //start_simulator(); /* Drawing of. */
 
         event_dispatch();
 

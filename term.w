@@ -315,14 +315,16 @@ term_draw (void)
         }
 
         cgl_blit();
-        //for (y = 0; y < Table.row; y++) {
-        //        cgl_draw_line(Table.line[y], y, 0, Table.col);
-        //}
-        //cgl_draw_cursor(mc, Table.line[mc.y][mc.x],
-        //        Table.oc, Table.line[Table.oc.y][Table.oc.x]);
-        //cgl_draw_end();
-        //if (Table.oc.x != mc.x || Table.oc.y != mc.y)
-        //        xximspot(mc);
+#if 0
+        for (y = 0; y < Table.row; y++) {
+                cgl_draw_line(Table.line[y], y, 0, Table.col);
+        }
+        cgl_draw_cursor(mc, Table.line[mc.y][mc.x],
+                Table.oc, Table.line[Table.oc.y][Table.oc.x]);
+        cgl_draw_end();
+        if (Table.oc.x != mc.x || Table.oc.y != mc.y)
+                xximspot(mc);
+#endif
         Table.oc = mc;
 }
 
