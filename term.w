@@ -280,7 +280,11 @@ term_resize (int col,
 	Table.c = c;
 }
 
-@ @c
+@ The row of the cell is calculated as |Table.row - y - 1| to invert
+the terminals cells' origin at the top left co-ordinates to graphical
+origin at the bottom left co-ordinates.
+
+@c
 void
 term_draw (void)
 {
@@ -304,7 +308,7 @@ term_draw (void)
                         p = z;
                         for (x = 0; x < Table.col; x++) {
                                 r = Table.line[y][x];
-                                cgl_draw_glyph(x, y, r.bg, r.fg,
+                                cgl_draw_glyph(x, Table.row - y - 1, r.bg, r.fg,
                                         FACE_NORMAL, p.u, y+x);//r.u);
                                 if (r.u == ' ') /* Or other unprintable */
                                         p = z;
