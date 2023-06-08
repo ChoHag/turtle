@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "newwin.h"
 #include "st.h"
 #include "win.h"
 
@@ -184,7 +185,6 @@ static void tmoveato(int, int);
 static void tnewline(int);
 static void tputtab(int);
 static void tputc(Rune);
-static void treset(void);
 static void tscrollup(int, int);
 static void tscrolldown(int, int);
 static void tsetattr(const int *, int);
@@ -1472,10 +1472,10 @@ tsetmode(int priv, int set, const int *args, int narg)
 		if (priv) {
 			switch (*args) {
 			case 1: /* DECCKM -- Cursor key */
-				xsetmode(set, MODE_APPCURSOR);
+				gxsetmode(set, MODE_APPCURSOR);
 				break;
 			case 5: /* DECSCNM -- Reverse video */
-				xsetmode(set, MODE_REVERSE);
+				gxsetmode(set, MODE_REVERSE);
 				break;
 			case 6: /* DECOM -- Origin */
 				MODBIT(term.c.state, set, CURSOR_ORIGIN);
@@ -1495,36 +1495,36 @@ tsetmode(int priv, int set, const int *args, int narg)
 			case 12: /* att610 -- Start blinking cursor (IGNORED) */
 				break;
 			case 25: /* DECTCEM -- Text Cursor Enable Mode */
-				xsetmode(!set, MODE_HIDE);
+				gxsetmode(!set, MODE_HIDE);
 				break;
 			case 9:    /* X10 mouse compatibility mode */
-				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEX10);
+				gxsetpointermotion(0);
+				gxsetmode(0, MODE_MOUSE);
+				gxsetmode(set, MODE_MOUSEX10);
 				break;
 			case 1000: /* 1000: report button press */
-				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEBTN);
+				gxsetpointermotion(0);
+				gxsetmode(0, MODE_MOUSE);
+				gxsetmode(set, MODE_MOUSEBTN);
 				break;
 			case 1002: /* 1002: report motion on button press */
-				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEMOTION);
+				gxsetpointermotion(0);
+				gxsetmode(0, MODE_MOUSE);
+				gxsetmode(set, MODE_MOUSEMOTION);
 				break;
 			case 1003: /* 1003: enable all mouse motions */
-				xsetpointermotion(set);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEMANY);
+				gxsetpointermotion(set);
+				gxsetmode(0, MODE_MOUSE);
+				gxsetmode(set, MODE_MOUSEMANY);
 				break;
 			case 1004: /* 1004: send focus events to tty */
-				xsetmode(set, MODE_FOCUS);
+				gxsetmode(set, MODE_FOCUS);
 				break;
 			case 1006: /* 1006: extended reporting mode */
-				xsetmode(set, MODE_MOUSESGR);
+				gxsetmode(set, MODE_MOUSESGR);
 				break;
 			case 1034:
-				xsetmode(set, MODE_8BIT);
+				gxsetmode(set, MODE_8BIT);
 				break;
 			case 1049: /* swap screen & set/restore cursor as xterm */
 				if (!allowaltscreen)
@@ -1549,7 +1549,7 @@ tsetmode(int priv, int set, const int *args, int narg)
 				tcursor((set) ? CURSOR_SAVE : CURSOR_LOAD);
 				break;
 			case 2004: /* 2004: bracketed paste mode */
-				xsetmode(set, MODE_BRCKTPASTE);
+				gxsetmode(set, MODE_BRCKTPASTE);
 				break;
 			/* Not implemented mouse modes. See comments there. */
 			case 1001: /* mouse highlight mode; can hang the
@@ -1572,7 +1572,7 @@ tsetmode(int priv, int set, const int *args, int narg)
 			case 0:  /* Error (IGNORED) */
 				break;
 			case 2:
-				xsetmode(set, MODE_KBDLOCK);
+				gxsetmode(set, MODE_KBDLOCK);
 				break;
 			case 4:  /* IRM -- Insertion-replacement */
 				MODBIT(term.mode, set, MODE_INSERT);
@@ -1802,7 +1802,7 @@ csihandle(void)
 	case ' ':
 		switch (csiescseq.mode[1]) {
 		case 'q': /* DECSCUSR -- Set Cursor Style */
-			if (xsetcursor(csiescseq.arg[0]))
+			if (gxsetcursor(csiescseq.arg[0]))
 				goto unknown;
 			break;
 		default:
@@ -1849,7 +1849,7 @@ osc_color_response(int num, int index, int is_osc4)
 	char buf[32];
 	unsigned char r, g, b;
 
-	if (xgetcolor(is_osc4 ? num : index, &r, &g, &b)) {
+	if (gxgetcolor(is_osc4 ? num : index, &r, &g, &b)) {
 		fprintf(stderr, "erresc: failed to fetch %s color %d\n",
 		        is_osc4 ? "osc4" : "osc",
 		        is_osc4 ? num : index);
@@ -1887,24 +1887,24 @@ strhandle(void)
 		switch (par) {
 		case 0:
 			if (narg > 1) {
-				xsettitle(strescseq.args[1]);
-				xseticontitle(strescseq.args[1]);
+				gxsettitle(strescseq.args[1]);
+				gxseticontitle(strescseq.args[1]);
 			}
 			return;
 		case 1:
 			if (narg > 1)
-				xseticontitle(strescseq.args[1]);
+				gxseticontitle(strescseq.args[1]);
 			return;
 		case 2:
 			if (narg > 1)
-				xsettitle(strescseq.args[1]);
+				gxsettitle(strescseq.args[1]);
 			return;
 		case 52:
 			if (narg > 2 && allowwindowops) {
 				dec = base64dec(strescseq.args[2]);
 				if (dec) {
-					xsetsel(dec);
-					xclipcopy();
+					gxsetsel(dec);
+					gxclipcopy();
 				} else {
 					fprintf(stderr, "erresc: invalid base64\n");
 				}
@@ -1921,7 +1921,7 @@ strhandle(void)
 
 			if (!strcmp(p, "?")) {
 				osc_color_response(par, osc_table[j].idx, 0);
-			} else if (xsetcolorname(osc_table[j].idx, p)) {
+			} else if (gxsetcolorname(osc_table[j].idx, p)) {
 				fprintf(stderr, "erresc: invalid %s color: %s\n",
 				        osc_table[j].str, p);
 			} else {
@@ -1938,9 +1938,9 @@ strhandle(void)
 
 			if (p && !strcmp(p, "?")) {
 				osc_color_response(j, 0, 1);
-			} else if (xsetcolorname(j, p)) {
+			} else if (gxsetcolorname(j, p)) {
 				if (par == 104 && narg <= 1) {
-					xloadcols();
+					gxloadcols();
 					return; /* color reset without parameter */
 				}
 				fprintf(stderr, "erresc: invalid color j=%d, p=%s\n",
@@ -1956,7 +1956,7 @@ strhandle(void)
 		}
 		break;
 	case 'k': /* old title set compatibility */
-		xsettitle(strescseq.args[0]);
+		gxsettitle(strescseq.args[0]);
 		return;
 	case 'P': /* DCS -- Device Control String */
 	case '_': /* APC -- Application Program Command */
@@ -2195,7 +2195,7 @@ tcontrolcode(uchar ascii)
 			/* backwards compatibility to xterm */
 			strhandle();
 		} else {
-			xbell();
+			gxbell();
 		}
 		break;
 	case '\033': /* ESC */
@@ -2329,13 +2329,13 @@ eschandle(uchar ascii)
 	case 'c': /* RIS -- Reset to initial state */
 		treset();
 		resettitle();
-		xloadcols();
+		gxloadcols();
 		break;
 	case '=': /* DECPAM -- Application keypad */
-		xsetmode(1, MODE_APPKEYPAD);
+		gxsetmode(1, MODE_APPKEYPAD);
 		break;
 	case '>': /* DECPNM -- Normal keypad */
-		xsetmode(0, MODE_APPKEYPAD);
+		gxsetmode(0, MODE_APPKEYPAD);
 		break;
 	case '7': /* DECSC -- Save Cursor */
 		tcursor(CURSOR_SAVE);
@@ -2617,8 +2617,42 @@ tresize(int col, int row)
 void
 resettitle(void)
 {
-	xsettitle(NULL);
+	gxsettitle(NULL);
 }
+
+#ifdef TURTLE_USEGL
+
+Glyph
+truneat (int row,
+         int col)
+{
+        return term.line[row][col];
+}
+
+void
+tdraw (void (*imp)(int, int))
+{
+	int cx = term.c.x, ocx = term.ocx, ocy = term.ocy;
+
+	/* adjust cursor position */
+	LIMIT(term.ocx, 0, term.col-1);
+	LIMIT(term.ocy, 0, term.row-1);
+	if (term.line[term.ocy][term.ocx].mode & ATTR_WDUMMY)
+		term.ocx--;
+	if (term.line[term.c.y][cx].mode & ATTR_WDUMMY)
+		cx--;
+
+        imp(term.row, term.col); /* And cursor */
+
+	term.ocx = cx;
+	term.ocy = term.c.y;
+#if 0
+	if (ocx != term.ocx || ocy != term.ocy)
+		xximspot(term.ocx, term.ocy);
+#endif
+}
+
+#else /* |TURTLE_USEGL| */
 
 void
 drawregion(int x1, int y1, int x2, int y2)
@@ -2666,3 +2700,4 @@ redraw(void)
 	tfulldirt();
 	draw();
 }
+#endif

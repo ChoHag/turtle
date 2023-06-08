@@ -6,19 +6,19 @@ TEST?=          prove
 CFLAGS+=        -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809
 # CFLAGS+=	-MD -MP
 CFLAGS+=        -Wall -Wpedantic -Wextra -Wno-implicit-fallthrough
+CFLAGS+=	-DTURTLE_USEGL=1
 CFLAGS+=        -I. $$(pkg-config --cflags gl glew glfw3 freetype2)
 LDFLAGS+=	-lm -lutil -levent
 LDFLAGS+=       $$(pkg-config --libs gl glew glfw3 freetype2)
 
 SHADERS=        fragment.o vertex.o
-MODULES=        turtle.o cgl.o io.o log.o matrix.o term.o vector.o
+MODULES=        turtle.o cgl.o io.o log.o matrix.o st.o term.o vector.o win.o
 FREETYPE=
 FREETYPE+=	ft/distance-field.o
 FREETYPE+=	ft/edtaa3func.o
 FREETYPE+=	ft/ftgl-utils.o
 FREETYPE+=	ft/texture-atlas.o
 FREETYPE+=	ft/texture-font.o
-LOSSLESS=	$$(pkg-config --libs lossless)
 
 ### Normal rules
 
@@ -32,13 +32,16 @@ ${MODULES}: matrix.h
 ${FREETYPE}: matrix.h cgl-opengl.h
 
 cgl-opengl.h: cgl.h
+newwin.h: win.c
 
+cgl.o: turtle.h io.h log.h newwin.h term.h vector.h
+cgl.o: fragment.c vertex.c
 io.o: turtle.h cgl.h log.h term.h
 log.o: turtle.h
-term.o: turtle.h cgl.h
-cgl.o: turtle.h io.h log.h term.h vector.h
-cgl.o: fragment.c vertex.c
+st.o: st.c st.h win.h cgl.h newwin.h
+term.o: turtle.h cgl.h newwin.h
 turtle.o: io.h cgl.h log.h term.h
+win.o: cgl.h st.h win.h
 
 *.tex: format.w types.w
 

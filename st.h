@@ -57,16 +57,6 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 typedef unsigned short ushort;
 
-typedef uint_least32_t Rune;
-
-#define Glyph Glyph_
-typedef struct {
-	Rune u;           /* character code */
-	ushort mode;      /* attribute flags */
-	uint32_t fg;      /* foreground  */
-	uint32_t bg;      /* background  */
-} Glyph;
-
 typedef Glyph *Line;
 
 typedef union {
@@ -88,7 +78,10 @@ void toggleprinter(const Arg *);
 
 int tattrset(int);
 void tnew(int, int);
+void tdraw (void (*imp)(int, int));
+void treset(void);
 void tresize(int, int);
+Glyph truneat (int, int);
 void tsetdirtattr(int);
 void ttyhangup(void);
 int ttynew(const char *, char *, const char *, char **);

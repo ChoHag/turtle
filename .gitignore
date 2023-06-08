@@ -32,7 +32,9 @@ fragment.c
 fragment.glsl
 io.[ch]
 log.[ch]
+newwin.h
 term.[ch]
 vector.[ch]
 vertex.c
 vertex.glsl
+win.c

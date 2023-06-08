@@ -21,6 +21,7 @@
 #include "cgl.h"
 #include "io.h"
 #include "log.h"
+#include "newwin.h"
 #include "vector.h"
 @#
 @<GL global variables@>@;
@@ -100,12 +101,13 @@ extern GLFWwindow *Win;
 @ @<GL fun...@>=
 void cgl_blit (void);
 void cgl_cb_resize (GLFWwindow *, int, int);
+void cgl_clear_vertex_buffer (void);
+void cgl_draw_glyph (int, int, bvec3_t, bvec3_t, int, uint32_t, uint32_t);
+void cgl_draw_space (int, int, bvec3_t, int);
 void cgl_events (void);
 void cgl_init (int, int, int);
+void cgl_set_title (char *);
 void cgl_window (int, int);
-void cgl_clear_vertex_buffer (void);
-void cgl_draw_glyph (int, int, bvec3_t, bvec3_t, int, trt_rune, trt_rune);
-void cgl_draw_space (int, int, bvec3_t, int);
 
 @ @<GL private...@>=
 static void cgl_cb_close (GLFWwindow *);
@@ -575,13 +577,13 @@ cgl_load_font (char   *name,
                 if (glyph == NULL)
                         err(1, "texture_font_get_glyph");
                 vwidth += glyph->advance_x;
-                if (glyph->width > cwidth)
+                if (glyph->width > (size_t) cwidth)
                         cwidth = glyph->width;
 
                 if (glyph->offset_y < 0) {/* descends only */
                         nheight = ndescent = -glyph->offset_y + glyph->height;
                         noffset = 0;
-                } else if (glyph->height < glyph->offset_y) {/* ascends only */
+                } else if (glyph->height < (size_t) glyph->offset_y) {/* ascends only */
                         nheight = noffset = glyph->offset_y;
                         ndescent = 0;
                 } else {
@@ -598,7 +600,7 @@ cgl_load_font (char   *name,
         vwidth /= 256 - ' ';
         if (vwidth - glyph->advance_x)
                 complain("Variable width font: average %f", vwidth);
-        inform("Loaded %zupt `%s' font, size %ux%u (%.2fx%.2f) + %.2f",
+        inform("Loaded %zupt `%s' font, size %ux%u (%.2fx%u) + %u",
                 size, name, (int) cwidth, (int) ceilf(height), vwidth,
                 height, offset);
         newface.width  = cwidth;
@@ -642,7 +644,7 @@ cgl_cb_resize (GLFWwindow *glwin,
         assert(glwin == Win);
         glViewport(0, 0, w, h);
         Projection = m4_ortho(0, w, 0, h, -1, 1);
-        term_resize(w / (int) Face[FACE_NORMAL].width,
+        gtresize(w / (int) Face[FACE_NORMAL].width,
                 h / (int) Face[FACE_NORMAL].height);
         inform("Resize window to %ux%u (%ux%u)", w, h,
                 w / (int) Face[FACE_NORMAL].width,
@@ -662,8 +664,8 @@ cgl_draw_glyph (int      x,
                 bvec3_t  bg,
                 bvec3_t  fg,
                 int      f,
-                trt_rune p,
-                trt_rune u)
+                uint32_t p  unused,
+                uint32_t u)
 {
         texture_glyph_t *glyph;
         vec2_t bbl, btr, fbl,ftr;
@@ -713,4 +715,11 @@ cgl_draw_glyph (int      x,
         };
         vector_push_back_data(Draw_Buffer, v, sizeof (v) / sizeof (v[0]));
         vector_push_back_data(Draw_Index, i, sizeof (i) / sizeof (i[0]));
+}
+
+@ @c
+void
+cgl_set_title (char *str)
+{
+        glfwSetWindowTitle(Win, str);
 }

@@ -119,16 +119,3 @@ tock_turtle (int    fd,
 
         real_clock = log_start;
 }
-
-@* Miscellaneous bits and pieces.
-
-|BETWEEN| evaluates to whether |x| is is between |a| and |b|
-inclusive. |LIMIT| ensures |x| is within those limites.
-
-These may evaluate their arguments more than once.
-
-@d LIMIT(x, a, b)   ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
-@d MIN(a, b)        ((a) < (b) ? (a) : (b))
-@d MAX(a, b)        ((a) < (b) ? (b) : (a))
-
-@d BETWEEN(x, a, b) ((a) <= (x) && (x) <= (b))
