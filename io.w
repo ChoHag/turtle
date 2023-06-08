@@ -172,7 +172,7 @@ io_child_handler (int    cfd,
         event_set(&Event_Child_Read, cfd, EV_READ | EV_PERSIST, rcb, NULL);
         event_add(&Event_Child_Read, NULL);
         assert(Event_Child_Write == NULL);
-        Event_Child_Write = bufferevent_new(0, NULL, NULL,
+        Event_Child_Write = bufferevent_new(cfd, NULL, NULL,
                 io_child_error, NULL);
         if (Event_Child_Write == NULL)
                 err(1, "bufferevent_new");

@@ -1,4 +1,12 @@
-freetype-gl in ft/ from https://github.com/rougier/freetype-gl.git
+Imports freetype-gl in ft/ from https://github.com/rougier/freetype-gl.git
 
-st in st/ from git://git.suckless.org/st
+Imports st in st.[ch] and win.h from git://git.suckless.org/st
 
+Depends on CWEB to build (install whatever provides the file
+`cwebmac.tex' and its dependencies, which are enormous although
+CWEB is tiny if you can be bothered to build it by hand) and these
+libraries:
+
+        event freetype2 gl glew glfw3
+
+Should build with BSD or GNU make.

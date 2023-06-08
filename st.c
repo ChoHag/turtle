@@ -793,7 +793,7 @@ ttynew(const char *line, char *cmd, const char *out, char **args)
 			die("ioctl TIOCSCTTY failed: %s\n", strerror(errno));
 		if (s > 2)
 			close(s);
-#ifdef __OpenBSD__
+#ifdef __OpenBSD__ /* This is kind of pointless since the process is about to |execvp|. */
 		if (pledge("stdio getpw proc exec", NULL) == -1)
 			die("pledge\n");
 #endif
@@ -2702,4 +2702,5 @@ redraw(void)
 	tfulldirt();
 	draw();
 }
-#endif
+
+#endif /* |TURTLE_USEGL| */

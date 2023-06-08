@@ -60,6 +60,19 @@ term_init (int col,
         Line_FD = ttynew(NULL, "/bin/sh", NULL, NULL); /* Returns the master side of a pty or an fd to the path in the line cli argument. */
         /* Now |iofd| is the fd to the path in the out cli argument or this processes stdout, |cmdfd| is |Line_FD|. */
         io_child_handler(Line_FD, gsigchld, term_read);
+
+        /* Also all the parts from |xinit| and pals which are skipped. */
+        // xloadfonts
+        // xloadcols
+        /* adjust fixed window geometry */
+        // events and a bunch of stuff with the root window
+        // Finish off the drawing context
+        // xim
+        // Mouse pointer?
+        // Window manager
+        // resettitle
+        // xhints
+        // selection
 }
 
 @ Needs replacement within st.c:

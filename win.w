@@ -4,6 +4,7 @@
 
 @c
 #include <assert.h>
+#include <stdbool.h>
 #include <wchar.h>
 @#
 #include "newwin.h"
@@ -347,11 +348,12 @@ gxsetsel (char *str)
 @* Exposing functions from \.{st.c}.
 
 @<Shared bridg...@>=
-void gsigchld (int, short, void *);
 void gselinit (void);
+void gsigchld (int, short, void *);
 void gtnew (int, int);
 void gtresize (int, int);
 Glyph gtruneat (int, int);
+void gttywrite (const char *, size_t, bool);
 void gttywriteraw (const char *, size_t);
 
 @ @c
@@ -406,6 +408,15 @@ void
 gttyread (void)
 {
         ttyread();
+}
+
+@ @c
+void
+gttywrite (const char *buf,
+           size_t      len,
+           bool        echo)
+{
+        ttywrite(buf, len, echo);
 }
 
 @ @c
