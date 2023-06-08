@@ -15,7 +15,6 @@ communicating with other processes and with human users.
 @#
 #include <matrix.h>
 #include <event.h>
-#include <imsg.h>
 #include "cgl-opengl.h"
 @#
 #include "turtle.h"
@@ -42,7 +41,8 @@ struct {
 struct event Win_Clock;
 
 struct event Event_SIGABRT, Event_SIGINT, Event_SIGQUIT, Event_SIGTERM;
-struct bufferevent *Event_STDIN = NULL;
+struct event Event_SIGCHLD, Event_Child_Read;
+struct bufferevent *Event_Child_Write = NULL;
 
 @ @<IO fun...@>=
 void io_events (void);
@@ -50,11 +50,13 @@ void io_init (int, int, int, long);
 void io_reset_clock (struct timespec *);
 void io_stop (void);
 void io_terminate (void);
+void io_child_handler (int, void (*)(int, short, void *),
+        void (*)(int, short, void *));
+int io_child_write (char *, size_t);
 
 @ @<IO private...@>=
-static void io_stdio_error (struct bufferevent *, short, void *);
+static void io_child_error (struct bufferevent *, short, void *);
 static void io_sighook (int, short, void *);
-static void io_stdio_read (struct bufferevent *, void *);
 
 @ @c
 void
@@ -71,12 +73,6 @@ io_init (int  w,
         signal_add(&Event_SIGQUIT, NULL);
         signal_set(&Event_SIGTERM, SIGTERM, io_sighook, NULL);
         signal_add(&Event_SIGTERM, NULL);
-        assert(Event_STDIN == NULL);
-        Event_STDIN = bufferevent_new(0, io_stdio_read, NULL,
-                io_stdio_error, NULL);
-        if (Event_STDIN == NULL)
-                err(1, "bufferevent_new");
-        bufferevent_enable(Event_STDIN, EV_READ);
 
         cgl_init(w, h, s);
 
@@ -105,21 +101,13 @@ io_sighook (int    sig    unused,
 
 @ @c
 static void
-io_stdio_error (struct bufferevent *ebuf,
+io_child_error (struct bufferevent *ebuf,
                 short               what,
                 void               *arg  unused)
 {
-        assert(ebuf == Event_STDIN);
+        assert(ebuf == Event_Child_Write);
         if (!(what & EVBUFFER_EOF))
-                err(1, "io_stdio_error");
-}
-
-@ @c
-static void
-io_stdio_read (struct bufferevent *ebuf unused,
-               void               *arg  unused)
-{
-        return;
+                err(1, "io_child_error");
 }
 
 @ Called to remove background (signal-handling) events to stop the event loop.
@@ -133,9 +121,15 @@ io_stop (void)
         signal_del(&Event_SIGINT);
         signal_del(&Event_SIGQUIT);
         signal_del(&Event_SIGTERM);
-        bufferevent_disable(Event_STDIN, EV_READ);
-        bufferevent_free(Event_STDIN);
-        Event_STDIN = NULL;
+        if (signal_initialized(&Event_SIGCHLD))
+                signal_del(&Event_SIGCHLD);
+        if (event_initialized(&Event_Child_Read))
+                event_del(&Event_Child_Read);
+        if (Event_Child_Write) {
+                bufferevent_disable(Event_Child_Write, EV_READ);
+                bufferevent_free(Event_Child_Write);
+                Event_Child_Write = NULL;
+        }
 }
 
 @ Must not happen until the evnt loop has ended.
@@ -164,4 +158,31 @@ void
 io_events (void)
 {
         glfwPollEvents();
+}
+
+@ @c
+void
+io_child_handler (int    cfd,
+                  void (*scb)(int, short, void *),
+                  void (*rcb)(int, short, void *))
+{
+        assert(!signal_initialized(&Event_SIGCHLD));
+        signal_set(&Event_SIGCHLD, SIGCHLD, scb, NULL);
+        signal_add(&Event_SIGCHLD, NULL);
+        event_set(&Event_Child_Read, cfd, EV_READ | EV_PERSIST, rcb, NULL);
+        event_add(&Event_Child_Read, NULL);
+        assert(Event_Child_Write == NULL);
+        Event_Child_Write = bufferevent_new(0, NULL, NULL,
+                io_child_error, NULL);
+        if (Event_Child_Write == NULL)
+                err(1, "bufferevent_new");
+        bufferevent_enable(Event_Child_Write, EV_WRITE);
+}
+
+@ @c
+int
+io_child_write (char   *buf,
+                size_t  len)
+{
+        return bufferevent_write(Event_Child_Write, buf, len);
 }

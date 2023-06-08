@@ -67,6 +67,7 @@ typedef union {
 	const char *s;
 } Arg;
 
+void sigchld(int);
 void die(const char *, ...);
 void redraw(void);
 void draw(void);
@@ -88,6 +89,7 @@ int ttynew(const char *, char *, const char *, char **);
 size_t ttyread(void);
 void ttyresize(int, int);
 void ttywrite(const char *, size_t, int);
+void ttywriteraw(const char *, size_t);
 
 void resettitle(void);
 

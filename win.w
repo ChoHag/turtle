@@ -11,7 +11,9 @@
 #include "win.h"
 @#
 #include "cgl-opengl.h"
+#include "turtle.h"
 #include "cgl.h"
+#include "io.h"
 
 @<Very global variables@>@;
 
@@ -345,10 +347,12 @@ gxsetsel (char *str)
 @* Exposing functions from \.{st.c}.
 
 @<Shared bridg...@>=
-void gselnew (void);
+void gsigchld (int, short, void *);
+void gselinit (void);
 void gtnew (int, int);
 void gtresize (int, int);
 Glyph gtruneat (int, int);
+void gttywriteraw (const char *, size_t);
 
 @ @c
 void
@@ -386,4 +390,32 @@ void
 gselinit (void)
 {
         selinit();
+}
+
+@ @c
+void
+gsigchld (int    sigid,
+          short  events unused,
+          void  *arg    unused)
+{
+        sigchld(sigid);
+}
+
+@ @c
+void
+gttyread (void)
+{
+        ttyread();
+}
+
+@ @c
+void
+gttywriteraw (const char *s,
+              size_t      n)
+{
+#ifdef TURTLE_USEGL
+        io_child_write((char *) s, n);
+#else
+        ttywriteraw(s, n);
+#endif
 }

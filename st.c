@@ -155,8 +155,6 @@ typedef struct {
 
 static void execsh(char *, char **);
 static void stty(char **);
-static void sigchld(int);
-static void ttywriteraw(const char *, size_t);
 
 static void csidump(void);
 static void csihandle(void);
@@ -784,11 +782,11 @@ ttynew(const char *line, char *cmd, const char *out, char **args)
 	case -1:
 		die("fork failed: %s\n", strerror(errno));
 		break;
-	case 0:
-		close(iofd);
-		close(m);
+	case 0: /* |cmdfd| is unset and irrelevant to the child process. */
+		close(iofd); /* Normally stdout or \.{`out`}; not needed in the child. */
+		close(m); /* Master side of pty */
 		setsid(); /* create a new process group */
-		dup2(s, 0);
+		dup2(s, 0); /* Replace the child's stdio triplet with the slave side of the pty. */
 		dup2(s, 1);
 		dup2(s, 2);
 		if (ioctl(s, TIOCSCTTY, NULL) < 0)
@@ -803,15 +801,19 @@ ttynew(const char *line, char *cmd, const char *out, char **args)
 		break;
 	default:
 #ifdef __OpenBSD__
+#if 0 /* TODO: work out which extra syscalls opengl needs. */
 		if (pledge("stdio rpath tty proc", NULL) == -1)
 			die("pledge\n");
 #endif
-		close(s);
-		cmdfd = m;
+#endif
+		close(s); /* Slave side of pty */
+		cmdfd = m; /* Master side of pty */
+#ifndef TURTLE_USEGL
 		signal(SIGCHLD, sigchld);
+#endif
 		break;
 	}
-	return cmdfd;
+	return cmdfd; /* Master side of pty; child never reaches here. */
 }
 
 size_t
@@ -849,7 +851,7 @@ ttywrite(const char *s, size_t n, int may_echo)
 		twrite(s, n, 1);
 
 	if (!IS_SET(MODE_CRLF)) {
-		ttywriteraw(s, n);
+		gttywriteraw(s, n);
 		return;
 	}
 
@@ -857,11 +859,11 @@ ttywrite(const char *s, size_t n, int may_echo)
 	while (n > 0) {
 		if (*s == '\r') {
 			next = s + 1;
-			ttywriteraw("\r\n", 2);
+			gttywriteraw("\r\n", 2);
 		} else {
 			next = memchr(s, '\r', n);
 			DEFAULT(next, s + n);
-			ttywriteraw(s, next - s);
+			gttywriteraw(s, next - s);
 		}
 		n -= next - s;
 		s = next;

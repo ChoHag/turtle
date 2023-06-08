@@ -41,7 +41,7 @@ log.o: turtle.h
 st.o: st.c st.h win.h cgl.h newwin.h
 term.o: turtle.h cgl.h newwin.h
 turtle.o: io.h cgl.h log.h term.h
-win.o: cgl.h st.h win.h
+win.o: cgl.h io.h st.h win.h
 
 *.tex: format.w types.w
 
