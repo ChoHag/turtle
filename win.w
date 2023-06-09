@@ -355,6 +355,7 @@ void gtresize (int, int);
 Glyph gtruneat (int, int);
 void gttywrite (const char *, size_t, bool);
 void gttywriteraw (const char *, size_t);
+size_t gutf8encode (int32_t, char *);
 
 @ @c
 void
@@ -429,4 +430,12 @@ gttywriteraw (const char *s,
 #else
         ttywriteraw(s, n);
 #endif
+}
+
+@ @c
+size_t
+gutf8encode (int32_t  cp,
+             char    *buf)
+{
+        return utf8encode(cp, buf);
 }

@@ -10,3 +10,44 @@ libraries:
         event freetype2 gl glew glfw3
 
 Should build with BSD or GNU make.
+
+Unfortunately GLFW assumes control of the window's input events and
+performs some processing on them before entering the application's
+callbacks. The application is faced with a choice between
+not-quite-direct from X press/repeat/release events without any
+ability to interrogate the advanced X input methods, or unicode
+codepoints received through those same input methods but GLFW drops
+the C0 and C1 control codes (its documentation doesn't mention
+this). Or both simultaneously.
+
+Additionally the callback which reponds with fully-processed input
+_and_ the state of the modifier keys is marked as deprecated.
+
+Since I can't see any good reason to drop the control codes or
+deprecate the only method to obtain the modifier flags alongside
+the unicode codepoint they accompany I propose solving this by not
+deprecating glfwSetCharModsCallback but expanding it to send the
+control codes before they're lost (and only it; glfwSetCharCallback
+remains unchanged for users who don't want exotic things like enter
+or backspace).
+
+--- src/input.c~	Thu Jul 14 23:11:23 2022
++++ src/input.c	Fri Jun  9 12:22:19 2023
+@@ -280,14 +280,14 @@
+ //
+ void _glfwInputChar(_GLFWwindow* window, uint32_t codepoint, int mods, GLFWbool plain)
+ {
+-    if (codepoint < 32 || (codepoint > 126 && codepoint < 160))
+-        return;
+-
+     if (!window->lockKeyMods)
+         mods &= ~(GLFW_MOD_CAPS_LOCK | GLFW_MOD_NUM_LOCK);
+ 
+     if (window->callbacks.charmods)
+         window->callbacks.charmods((GLFWwindow*) window, codepoint, mods);
++
++    if (codepoint < 32 || (codepoint > 126 && codepoint < 160))
++        return;
+ 
+     if (plain)
+     {

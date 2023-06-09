@@ -111,10 +111,9 @@ void cgl_window (int, int);
 
 @ @<GL private...@>=
 static void cgl_cb_close (GLFWwindow *);
+static void cgl_cb_codepoint (GLFWwindow *, unsigned int, int);
 static void cgl_cb_debug (GLenum, GLenum, unsigned int, GLenum, GLsizei,
         const char *,@| const void *);
-static void cgl_cb_key (GLFWwindow *, int, int, int, int);
-static void cgl_cb_text (GLFWwindow *, unsigned int);
 static GLuint cgl_compile_shader (GLenum, char *, long);
 static void cgl_glerror (int, const char *);
 static void cgl_load_shader_program (void);
@@ -143,7 +142,7 @@ cgl_init (int w,
 
         glfwSetErrorCallback(cgl_glerror);
         if (!glfwInit())
-                errx(1, "glfwInit");
+                errx(1, "glfwInit"); /* May call |setlocale(LC_CTYPE, "")|. */
         inform("Using GLFW %s", glfwGetVersionString());
 
         cgl_window(w, h);
@@ -308,8 +307,7 @@ cgl_window (int w,
 
         glfwSetFramebufferSizeCallback(new_win, cgl_cb_resize);
         glfwSetWindowCloseCallback(new_win, cgl_cb_close);
-        glfwSetKeyCallback(new_win, cgl_cb_key);
-        glfwSetCharCallback(new_win, cgl_cb_text);
+        glfwSetCharModsCallback(new_win, cgl_cb_codepoint);
 
         glfwMakeContextCurrent(new_win);
         Win = new_win;
@@ -728,52 +726,20 @@ cgl_set_title (char *str)
         glfwSetWindowTitle(Win, str);
 }
 
-@* Input. ``The callback function receives the keyboard key,
-platform-specific scancode, key action and modifier bits.''
-
-The list of key symbols is at
-\pdfURL{https://www.glfw.org/docs/latest/group\_\_keys.html}%
-{https://www.glfw.org/docs/latest/group__keys.html}.
-
-This replaces |kpress| wholesale.
-
-Note that the |IS_SET| in x.c is a {\it different macro\/} than the
-|IS_SET| in st.c.
+@* Input. Owing to the unicode input problem described in the README
+this callback depends on a patched libglfw.
 
 @c
 void
-cgl_cb_key (GLFWwindow *window,
-            int         key,
-            int         scancode,
-            int         action,
-            int         mods)
+cgl_cb_codepoint (GLFWwindow   *window,
+                  unsigned int  codepoint,
+                  int           mods)
 {
-        char buf[64];
+        char buf[4];
+        int len;
 
-        /* Skip st's shortcuts (do gl syms and x syms match?) \AM\
-                customisation from \.{config.h}. */
-
-        if (action == GLFW_PRESS)
-                printf("press %d%c .. %d\n", mods, key, scancode);
-        if (action == GLFW_REPEAT)
-                printf("repeat %d%c .. %d\n", mods, key, scancode);
-
-        // gttywrite(&key, 1, true);
-}
-
-@ The GLFW manual says that this callback ``supports text input in
-the form of a stream of Unicode code points, as produced by the
-operating system text input system''. What that means for keys which
-don't map cleanly to codepoints isn't mentioned. Although you are
-admonished to use it in favour of the plain key callback if you
-want to consider anything suitable for non-English or accessible
-input, you need to go figure out how on your own.
-
-@c
-void
-cgl_cb_text (GLFWwindow   *window,
-             unsigned int  codepoint)
-{
-        printf("key %u\n", codepoint);
-        gttywrite(&codepoint, 1, true);
+        printf("codepoint %u+%d\n", codepoint, mods);
+        len = gutf8encode(codepoint, buf);
+        assert(len && len <= 4);
+        gttywrite(buf, len, true);
 }
